@@ -57,43 +57,43 @@ def generate_image_from_image(
             # Oluşturma işlemi
             result = pipe(
                 prompt=prompt,
-                )
-            
-            image = result.images[0]
-            logger.info("Görsel dönüştürme başarılı")
-            return image
-            
-        except torch.cuda.OutOfMemoryError:
-            logger.warning("GPU bellek yetersiz, düşük bellek modu deneniyor...")
-            
-            # Belleği temizle
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            
-            # Daha küçük boyutta dene
-            small_image = init_image.resize((512, 384))
-            
-            # Daha düşük parametrelerle tekrar dene
-            with torch.inference_mode():
-                result = pipe(
-                    prompt=enriched_prompt,
-                    image=small_image,
-                    strength=strength,
-                    num_inference_steps=min(int(num_steps), 30)
-                )
-            
-            return result.images[0]
-    
-    except Exception as e:
-        logger.exception(f"Görsel dönüştürme hatası: {e}")
-        return Image.new('RGB', (512, 512), color='gray')
-
-def enrich_img2img_prompt(prompt):
-    """Image2Image için prompt zenginleştirme"""
-    quality_keywords = ["yüksek detay", "8k", "yüksek kalite"]
-    
-    # Eğer promp zaten yeterince detaylı ise değiştirme
-    if len(prompt.split()) > 8 or any(keyword in prompt.lower() for keyword in quality_keywords):
-        return prompt
+                image=init_image,
+                strength=strength,
+                guidance_scale=guidance_scale,
+                negative_prompt=negative_prompt,
+                num_inference_steps=num_steps
+            )
         
-    return prompt + ", yüksek detay, 8k çözünürlük"
+        elapsed_time = time.time() - start_time
+        logger.info(f"Görsel dönüştürme tamamlandı: {elapsed_time:.2f} saniye")
+        
+        # NSFW kontrolü
+        if hasattr(result, "nsfw_content_detected") and result.nsfw_content_detected is not None:
+            if any(result.nsfw_content_detected):
+                logger.warning("NSFW içerik tespit edildi, görsel blurlanabilir")
+        
+        # Sonucu döndür
+        if result and hasattr(result, "images") and len(result.images) > 0:
+            return result.images[0]
+        else:
+            logger.warning("Görsel dönüştürme başarısız oldu, sonuç bulunamadı")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Görsel dönüştürülürken hata: {e}", exc_info=True)
+        return None
+
+if __name__ == "__main__":
+    # Test
+    test_input = Image.new("RGB", (512, 512), color="white")
+    result_image = generate_image_from_image(
+        test_input, 
+        "A beautiful mountain landscape, photorealistic", 
+        strength=0.8
+    )
+    
+    if result_image:
+        result_image.save("img2img_test_output.png")
+        print("Test başarılı, sonuç kaydedildi: img2img_test_output.png")
+    else:
+        print("Test başarısız")

@@ -1,37 +1,78 @@
-# GPU Kullanımı Hakkında Bilgi
+# GPU Kullanımı ve Optimizasyon Rehberi
 
-Bu yapay zeka görsel oluşturma yazılımı, yapay zeka modellerini çalıştırmak için GPU (ekran kartı) kullanır. Aşağıda sistemin GPU kullanımı hakkında sık sorulan sorular ve cevaplarını bulabilirsiniz:
+Bu dokümanda, görüntü üretimi sırasında GPU kullanımı ve optimizasyonu hakkında bilgiler yer almaktadır.
 
-## Hangi GPU Kullanılıyor?
+## GPU Gereksinimleri
 
-Sistem, **çalıştığı bilgisayar/sunucudaki** GPU'yu kullanır:
+Diffusion modelleri hesaplama açısından yoğun işlemlerdir ve GPU kullanımı, işlem süresini önemli ölçüde hızlandırır:
 
-1. **Yerel Çalıştırma**: Uygulamayı kendi bilgisayarınızda çalıştırıyorsanız, kendi bilgisayarınızın GPU'su kullanılır.
+- **Minimum**: 4GB VRAM (düşük çözünürlük, düşük kalite)
+- **Önerilen**: 8GB+ VRAM (512x512 görüntüler için)
+- **Optimum**: 12GB+ VRAM (yüksek çözünürlük ve batch işlemler için)
 
-2. **Sunucu Üzerinde Çalıştırma**: Uygulama bir sunucuda çalışıyorsa ve siz web tarayıcısı üzerinden erişiyorsanız, sunucunun GPU'su kullanılır, sizin ekran kartınız kullanılmaz.
+## GPU Bellek Optimizasyonu Teknikleri
 
-## GPU Gerekli mi?
+GPU belleğinden tasarruf etmek için aşağıdaki teknikleri kullanabilirsiniz:
 
-Sistem CPU üzerinde de çalışabilir, ancak:
+### 1. Düşük Bellek Modu
 
-- GPU olmadan işlemler 10-20 kat daha yavaş olacaktır
-- Görsel oluşturma süreleri dakikalar alabilir
-- Büyük modeller yüksek RAM gereksinimi nedeniyle çalışmayabilir
+Uygulama `--low-memory` parametresi ile başlatıldığında:
 
-## Minimum Gereksinimler
+- Model parçaları CPU ve GPU arasında taşınır
+- Uyarı: İşlem süresi uzar, ancak daha büyük modeller çalıştırılabilir
 
-- **GPU ile**: NVIDIA CUDA destekli ekran kartı, en az 4GB VRAM
-- **Sadece CPU ile**: En az 16GB RAM ve güçlü bir çoklu çekirdek işlemci
+### 2. Precision Değişiklikleri
 
-## GPU Performansı Nasıl Artırılır?
+- **float16**: Varsayılan olarak CUDA GPU'larda kullanılır, bellek kullanımını yarıya indirir
+- **float32**: CPU'da veya bazı işlerde daha yüksek doğruluk gerektiğinde kullanılır
 
-1. Sistem başlatıldığında otomatik olarak GPU'yu tespit eder
-2. Görüntü oluşturma esnasında GPU belleğini verimli kullanmak için adım sayısını düşürebilirsiniz
-3. Modeller ilk çalıştırmada GPU belleğine yüklenir ve sonraki kullanımlar için orada kalır
+### 3. Attention Slicing
 
-## GPU Bulunmadığında Ne Olur?
+Bellek tasarrufu sağlamak için dikkat katmanları bölünür:
+```python
+pipe.enable_attention_slicing()
+```
 
-Eğer sistem GPU tespit edemezse:
-1. Otomatik olarak CPU moduna geçer
-2. Arayüzde bir uyarı gösterilir
-3. İşlemler daha uzun sürer, ancak yine de çalışır
+### 4. VRAM Kullanımını İzleme
+
+GPU bellek kullanımını izlemek için:
+
+```python
+# Mevcut VRAM kullanımı
+print(f"Kullanılan: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+print(f"Önbelleğe alınan: {torch.cuda.memory_reserved() / 1024**3:.2f} GB")
+```
+
+### 5. xFormers Optimizasyonu
+
+xFormers kullanımı bellek verimliliğini artırabilir:
+
+```python
+pipe.enable_xformers_memory_efficient_attention()
+```
+
+## GPU Seçenekleri İçin Tavsiyeler
+
+| GPU Modeli | VRAM | Maksimum Çözünürlük | Tavsiye |
+|------------|------|---------------------|---------|
+| GTX 1650   | 4GB  | 512x512             | Düşük bellek modu kullanın |
+| GTX 1060   | 6GB  | 512x768             | Batch size=1, adım sayısını azaltın |
+| RTX 3060   | 12GB | 1024x1024           | Normal veya düşük bellek modu |
+| RTX 4090   | 24GB | 2048x2048+          | Tam performans modları |
+
+## CPU Kullanıcıları İçin
+
+GPU olmadan, aşağıdaki optimizasyon teknikleri önerilir:
+
+1. İşlem adımlarını azaltın (20-30 arası)
+2. Düşük çözünürlük kullanın (256x256 veya 384x384)
+3. Daha küçük modeller kullanın (örneğin, SD-1.5 vs SD-XL)
+4. İşlem sırasında sabrınızı koruyun, sonuçlar yavaş alınacaktır
+
+## Sistem Sorunları
+
+- **CUDA Hataları**: Pytorch ve CUDA sürümlerinin uyumluluğunu kontrol edin
+- **Yüksek CPU Kullanımı**: CPU önceliklendirme ayarlarını kontrol edin
+- **Düşük GPU Kullanımı**: CPU darboğazı olabilir, sistem izleme araçlarıyla kontrol edin
+
+Bu ayarlamalar, sistem kaynaklarınızı en verimli şekilde kullanmanızı sağlayacaktır.
