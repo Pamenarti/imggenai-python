@@ -304,17 +304,32 @@ class ModelManager:
         try:
             if "civitai.com" in lora_info["url"]:
                 logger.info(f"CivitAI'dan LoRA indiriliyor: {lora_id}")
-                response = requests.get(lora_info["url"], stream=True)
-                response.raise_for_status()
                 
-                with open(lora_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                # CivitAI API değişiklikleri nedeniyle artık bir token veya oturum gerekebilir
+                # Şimdilik kullanıcıya manuel indirme talimatları sağlayalım
+                logger.warning(f"CivitAI kimlik doğrulama hatası: API değişikliği olabilir.")
+                logger.info(f"LoRA dosyasını manuel olarak indirmek için: {lora_info['url']}")
+                logger.info(f"İndirilen dosyayı '{lora_path}' konumuna kaydedin ve uygulamayı yeniden başlatın.")
                 
-                logger.info(f"LoRA başarıyla indirildi: {lora_id}")
-                self.lora_paths[lora_id] = str(lora_path)
-                return str(lora_path)
-                
+                # Örnek alternatif indirme URL'si (eğer varsa)
+                alt_url = lora_info.get("alt_url")
+                if alt_url:
+                    logger.info(f"Alternatif kaynaktan indirmeyi deniyorum: {alt_url}")
+                    response = requests.get(alt_url, stream=True)
+                    response.raise_for_status()
+                    
+                    with open(lora_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    
+                    logger.info(f"LoRA başarıyla indirildi: {lora_id}")
+                    self.lora_paths[lora_id] = str(lora_path)
+                    return str(lora_path)
+                else:
+                    # Manuel indirme için varsayılan model döndür
+                    logger.warning("Manuel indirme gerekiyor, LoRA kullanılmadan devam ediliyor.")
+                    return None
+                    
         except Exception as e:
             logger.error(f"LoRA indirilirken hata oluştu: {e}")
             return None

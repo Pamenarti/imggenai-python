@@ -5,6 +5,10 @@ import tempfile
 import cv2
 import logging
 from PIL import Image, ImageDraw, ImageFont
+import shutil
+from pathlib import Path
+import time
+import subprocess
 
 # Loglama ayarları
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,24 +23,20 @@ except ImportError:
     logger.warning("Yüklemek için: pip install moviepy")
     MOVIEPY_AVAILABLE = False
 
-def generate_video_from_images(source_image, num_frames=30, fps=15, motion_scale=25, effect_type="zoom_pan"):
+def generate_video_from_images(
+    source_image, 
+    num_frames=30, 
+    fps=15, 
+    motion_scale=10.0,
+    output_dir="/home/agrotest2/imggenai/outputs"
+):
     """
-    Tek bir görselden hareketli video oluşturma
+    Tek bir görselden basit hareket efektleri ekleyerek video oluşturur.
     
     Args:
-        source_image: Kaynak görsel (PIL Image)
-        num_frames: Video kare sayısı
-        fps: Saniyedeki kare sayısı
-        motion_scale: Hareket ölçeği (daha büyük değerler = daha fazla hareket)
-        effect_type: Hareket efekti tipi ("zoom_pan", "rotate", "wave")
-        
-    Returns:
-        Oluşturulan video dosyasının yolu
-    """
-    try:
-        if source_image is None:
-            logger.error("Video oluşturulamadı: Kaynak görsel yok")
-            return None
+        source_image: PIL.Image - Kaynak görsel
+        num_frames: int - Video kareleri sayısı
+        fps: int - Video FPS değeri
             
         # MoviePy kontrolü
         if not MOVIEPY_AVAILABLE:

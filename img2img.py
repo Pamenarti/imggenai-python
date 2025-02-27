@@ -1,62 +1,62 @@
 import torch
-import numpy as np
-from PIL import Image
+import time
 import logging
-from model_manager import load_img2img_model, apply_lora_to_prompt, download_lora
+from PIL import Image
+from model_manager import load_img2img_model
 
 # Loglama ayarları
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Görselden görsel oluştur
-def generate_image_from_image(init_image, prompt, strength=0.8, num_steps=50, model_id=None, lora_id=None, low_memory=False):
+def generate_image_from_image(
+    init_image, 
+    prompt, 
+    strength=0.8, 
+    guidance_scale=7.5, 
+    num_steps=50,
+    model_id=None,
+    negative_prompt="",
+    low_memory=False
+):
     """
-    Bir kaynak görselden yeni bir görsel oluşturur
+    Var olan bir görselden yeni bir görsel oluşturur (img2img)
     
     Args:
-        init_image: Kaynak görsel
-        prompt: Metin açıklaması
-        strength: Değişim miktarı (0.0 - 1.0)
-        num_steps: Diffusion adım sayısı
-        model_id: Kullanılacak model kimliği
-        lora_id: Kullanılacak LoRA adaptasyonu
-        low_memory: Düşük bellek modu
+        init_image (PIL.Image): Başlangıç görseli
+        prompt (str): İstenen değişiklik için metin açıklaması
+        strength (float): Değişim miktarı (0.0-1.0 arası, 1.0 tamamen yeni görsele yaklaşır)
+        guidance_scale (float): Prompt'a ne kadar sadık olunacağı (CFG)
+        num_steps (int): Diffusion adımı sayısı
+        model_id (str): Kullanılacak model ID'si
+        negative_prompt (str): İstenmeyen özelliklerin belirtildiği metin
+        low_memory (bool): Düşük bellek modu aktif mi?
+        
+    Returns:
+        PIL.Image: Oluşturulan görsel
     """
     try:
-        if init_image is None:
-            return None
-            
-        logger.info(f"Görsel dönüştürülüyor: '{prompt}', strength={strength}")
+        start_time = time.time()
+        logger.info(f"Görsel dönüştürülüyor: '{prompt}'")
         
-        # Cihaz seçimi
-        device = "cuda" if torch.cuda.is_available() else "mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu"
+        # Cihaz belirleme
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         
-        # Image2Image modelini yükle
-        pipe = load_img2img_model(model_id=model_id, device=device, safety_checker=False, low_memory=low_memory)
+        # Img2img pipeline'ı yükle
+        pipe = load_img2img_model(model_id, device, safety_checker=True, low_memory=low_memory)
         
         if pipe is None:
-            logger.error("Model yüklenemedi!")
-            return Image.new('RGB', (512, 512), color='red')
+            logger.error("Img2img modeli yüklenemedi")
+            return None
         
-        # Görseli standart boyuta getir
-        init_image = init_image.resize((768, 512))
-        
-        # Prompt'u zenginleştir
-        enriched_prompt = enrich_img2img_prompt(prompt)
-        
-        # LoRA kullanılıyorsa prompt'u güncelle
-        if lora_id:
-            download_lora(lora_id)  # LoRA'yı indir (eğer yoksa)
-            enriched_prompt = apply_lora_to_prompt(enriched_prompt, lora_id)
-        
-        try:
-            # Görseli oluştur
-            with torch.inference_mode():
-                result = pipe(
-                    prompt=enriched_prompt,
-                    image=init_image,
-                    strength=strength,
-                    num_inference_steps=int(num_steps)
+        # Görseli oluştur
+        with torch.inference_mode():
+            # GPU varsa ve low_memory modundaysa önbellek temizle
+            if device == "cuda" and low_memory:
+                torch.cuda.empty_cache()
+            
+            # Oluşturma işlemi
+            result = pipe(
+                prompt=prompt,
                 )
             
             image = result.images[0]

@@ -1,6 +1,7 @@
 import torch
 import gc
 import os
+import time  # Eksik import eklendi
 import logging
 from PIL import Image
 import numpy as np
