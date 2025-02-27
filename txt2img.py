@@ -131,15 +131,21 @@ def generate_image_from_text(
         
         # NSFW denetimi - result.nsfw_content_detected None değilse
         if hasattr(result, "nsfw_content_detected") and result.nsfw_content_detected is not None:
-            if any(result.nsfw_content_detected):
-                logger.warning("NSFW içerik tespit edildi, görsel blurlanabilir")
+            try:
+                # İterasyon yapmadan önce gerçekten iterable olduğunu kontrol et
+                if isinstance(result.nsfw_content_detected, (list, tuple)) and any(result.nsfw_content_detected):
+                    logger.warning("NSFW içerik tespit edildi, görsel blurlanabilir")
+            except Exception as e:
+                logger.debug(f"NSFW denetimi sırasında hata: {e}")
         
         # Görüntüyü döndür
-        if result and hasattr(result, "images") and len(result.images) > 0:
+        if result and hasattr(result, "images") and isinstance(result.images, (list, tuple)) and len(result.images) > 0:
             return result.images[0]
         else:
             if debug:
                 logger.debug("Result yapısı: " + str(type(result)))
+                if result and hasattr(result, "images"):
+                    logger.debug(f"Images tipi: {type(result.images)}")
             return None
         
     except Exception as e:
